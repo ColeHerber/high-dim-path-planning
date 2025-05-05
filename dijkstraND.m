@@ -1,5 +1,5 @@
-function [path, explored] = astar(p)
-    % A* algorithm implementation for finding optimal path in an N-dimensional grid
+function [path, explored] = dijkstraND(p)
+    % Dijkstra algorithm implementation for finding optimal path in an N-dimensional grid
     % Inputs:
     %   grid - N-dimensional matrix where 1 represents obstacles and 0 represents free space
     %   start - 1xN vector with coordinates of start position
@@ -13,7 +13,7 @@ function [path, explored] = astar(p)
     %   explored - KxN matrix containing all explored nodes
     
     % Check inputs
-    grid = p.ToGrid;
+    grid = p.ToGrid(p);
     start = p.Start;
     goal = p.End;
     connectivity = p.Conn;
@@ -34,26 +34,27 @@ function [path, explored] = astar(p)
     moves = generateMoves(dims, connectivity);
     
     % Initialize data structures
-    % openSet stores nodes to be evaluated: [coords, f, g, parent_idx]
-    % f = g + h (total cost), g = cost from start, parent_idx = index in closedSet
+    % openSet stores nodes to be evaluated: [coords, distance, parent_idx]
+    % distance = accumulated cost from start, parent_idx = index in closedSet
     maxNodes = prod(gridSize); % Maximum possible nodes
-    openSet = zeros(maxNodes, dims+3);
+    openSet = zeros(maxNodes, dims+2);
     openSet(1, 1:dims) = start;
-    openSet(1, dims+1) = heuristic(start, goal);
-    openSet(1, dims+2:dims+3) = [0, 0]; % g=0, parent=0
+    openSet(1, dims+1:dims+2) = [0, 0]; % distance=0, parent=0
     openCount = 1;
     
-    % closedSet stores evaluated nodes: [coords, g, parent_idx]
+    % closedSet stores evaluated nodes: [coords, distance, parent_idx]
     closedSet = zeros(maxNodes, dims+2);
     closedCount = 0;
     
     % Main loop
-    while openCount > 0
-        % Find node with lowest f value in openSet
+    goalReached = false;
+    
+    while openCount > 0 && ~goalReached
+        % Find node with lowest distance value in openSet
         [~, currentIdx] = min(openSet(1:openCount, dims+1));
         current = openSet(currentIdx, 1:dims);
-        currentG = openSet(currentIdx, dims+2);
-        currentParentIdx = openSet(currentIdx, dims+3);
+        currentDist = openSet(currentIdx, dims+1);
+        currentParentIdx = openSet(currentIdx, dims+2);
         
         % Remove current from openSet by swapping with last element and reducing count
         openSet(currentIdx, :) = openSet(openCount, :);
@@ -61,10 +62,11 @@ function [path, explored] = astar(p)
         
         % Add current to closedSet
         closedCount = closedCount + 1;
-        closedSet(closedCount, :) = [current, currentG, currentParentIdx];
+        closedSet(closedCount, :) = [current, currentDist, currentParentIdx];
         
         % Check if we've reached the goal
         if isequal(current, goal)
+            goalReached = true;
             break;
         end
         
@@ -92,21 +94,21 @@ function [path, explored] = astar(p)
                 continue;
             end
             
-            % Calculate tentative g score (cost from start)
+            % Calculate tentative distance (cost from start)
             % Use Euclidean distance for move cost when using 'full' connectivity
             if strcmp(connectivity, 'full')
                 moveCost = sqrt(sum(moves(i, :).^2));
             else
                 moveCost = 1; % Uniform cost for 'minimal' connectivity
             end
-            tentativeG = currentG + moveCost;
+            tentativeDist = currentDist + moveCost;
             
-            % Check if neighbor is in closedSet with better g score
+            % Check if neighbor is in closedSet with better distance
             inClosed = false;
             for j = 1:closedCount
                 if isequal(closedSet(j, 1:dims), neighbor)
                     inClosed = true;
-                    if closedSet(j, dims+1) <= tentativeG
+                    if closedSet(j, dims+1) <= tentativeDist
                         break;  % Skip this neighbor as we already have better path
                     else
                         % Remove from closedSet to reevaluate
@@ -126,13 +128,12 @@ function [path, explored] = astar(p)
             for j = 1:openCount
                 if isequal(openSet(j, 1:dims), neighbor)
                     inOpen = true;
-                    if openSet(j, dims+2) <= tentativeG
+                    if openSet(j, dims+1) <= tentativeDist
                         break;  % Skip this neighbor as we already have better path
                     else
-                        % Update g score and parent
-                        openSet(j, dims+2) = tentativeG;
-                        openSet(j, dims+1) = tentativeG + heuristic(neighbor, goal);
-                        openSet(j, dims+3) = closedCount;
+                        % Update distance and parent
+                        openSet(j, dims+1) = tentativeDist;
+                        openSet(j, dims+2) = closedCount;
                         break;
                     end
                 end
@@ -142,9 +143,8 @@ function [path, explored] = astar(p)
             if ~inOpen
                 openCount = openCount + 1;
                 openSet(openCount, 1:dims) = neighbor;
-                openSet(openCount, dims+1) = tentativeG + heuristic(neighbor, goal);
-                openSet(openCount, dims+2) = tentativeG;
-                openSet(openCount, dims+3) = closedCount;
+                openSet(openCount, dims+1) = tentativeDist;
+                openSet(openCount, dims+2) = closedCount;
             end
         end
     end
@@ -153,7 +153,7 @@ function [path, explored] = astar(p)
     path = [];
     explored = closedSet(1:closedCount, 1:dims);
     
-    if closedCount > 0 && isequal(closedSet(closedCount, 1:dims), goal)
+    if goalReached
         % Backtrack from goal to start using parent indices
         path = zeros(closedCount, dims);
         pathLength = 0;
@@ -168,13 +168,8 @@ function [path, explored] = astar(p)
         % Reverse path to get from start to goal
         path = path(pathLength:-1:1, :);
     else
-        %disp('No path found to goal!');
+        disp('No path found to goal!');
     end
-end
-
-function h = heuristic(point, goal)
-    % Calculate heuristic using Euclidean distance (L2 norm)
-    h = sqrt(sum((point - goal).^2));
 end
 
 function moves = generateMoves(dimensions, connectivityType)
@@ -215,7 +210,7 @@ function idx = coordToLinearIndex(coords, gridSize)
 end
 
 function visualizePathND(map, path, explored, start, goal)
-    % Visualize the path found by A* algorithm
+    % Visualize the path found by the algorithm
     % Currently supports visualization for 2D and 3D grids
     dims = ndims(map);
     
@@ -241,7 +236,7 @@ function visualizePathND(map, path, explored, start, goal)
         scatter(start(2), start(1), 100, 'red', 'filled', 'MarkerEdgeColor', 'k');
         scatter(goal(2), goal(1), 100, 'magenta', 'filled', 'MarkerEdgeColor', 'k');
         
-        title('A* Path Planning (2D)');
+        title('Dijkstra Path Planning (2D)');
         axis image;
         
     elseif dims == 3
@@ -269,7 +264,7 @@ function visualizePathND(map, path, explored, start, goal)
         scatter3(goal(1), goal(2), goal(3), 100, 'magenta', 'filled');
         
         xlabel('X'); ylabel('Y'); zlabel('Z');
-        title('A* Path Planning (3D)');
+        title('Dijkstra Path Planning (3D)');
         grid on;
         axis equal;
         view(30, 30);
@@ -283,27 +278,25 @@ function visualizePathND(map, path, explored, start, goal)
 end
 
 % Example usage for 2D, 3D, and higher dimensions:
-%{
-% % 2D Example
-% grid2D = zeros(20, 20);
-% grid2D(5:15, 10) = 1; % Add a wall
-% start2D = [1, 1];
-% goal2D = [20, 20];
-% [path2D, explored2D] = astarND(grid2D, start2D, goal2D, 'full');
-% visualizePathND(grid2D, path2D, explored2D, start2D, goal2D);
+
+% 2D Example
+grid2D = zeros(20, 20);
+grid2D(5:15, 10) = 1; % Add a wall
+start2D = [1, 1];
+goal2D = [20, 20];
+[path2D, explored2D] = dijkstraND(grid2D, start2D, goal2D, 'full');
+visualizePathND(grid2D, path2D, explored2D, start2D, goal2D);
 
 % 3D Example
 grid3D = zeros(20, 20, 20);
 grid3D(:, 10, 5:15) = 1; % Add a wall
 start3D = [1, 1, 1];
 goal3D = [20, 20, 20];
-[path3D, explored3D] = astarND(grid3D, start3D, goal3D, 'full');
+[path3D, explored3D] = dijkstraND(grid3D, start3D, goal3D, 'full');
 visualizePathND(grid3D, path3D, explored3D, start3D, goal3D);
-% 
+
 % % 4D Example (no visualization)
 % grid4D = zeros(10, 10, 10, 10);
 % start4D = [1, 1, 1, 1];
 % goal4D = [10, 10, 10, 10];
-% [path4D, explored4D] = astarND(grid4D, start4D, goal4D);
-
-%}
+% [path4D, explored4D] = dijkstraND(grid4D, start4D, goal4D);

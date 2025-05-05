@@ -1,4 +1,4 @@
-function [path, explored] = dijkstraND(grid, start, goal, connectivity)
+function [path, explored] = dijkstra(p)
     % Dijkstra algorithm implementation for finding optimal path in an N-dimensional grid
     % Inputs:
     %   grid - N-dimensional matrix where 1 represents obstacles and 0 represents free space
@@ -13,6 +13,10 @@ function [path, explored] = dijkstraND(grid, start, goal, connectivity)
     %   explored - KxN matrix containing all explored nodes
     
     % Check inputs
+    grid = p.ToGrid;
+    start = p.Start;
+    goal = p.End;
+    connectivity = p.Conn;
     if nargin < 4
         connectivity = 'minimal';
     end
@@ -164,7 +168,7 @@ function [path, explored] = dijkstraND(grid, start, goal, connectivity)
         % Reverse path to get from start to goal
         path = path(pathLength:-1:1, :);
     else
-        disp('No path found to goal!');
+        %disp('No path found to goal!');
     end
 end
 
@@ -274,7 +278,7 @@ function visualizePathND(map, path, explored, start, goal)
 end
 
 % Example usage for 2D, 3D, and higher dimensions:
-
+%{
 % 2D Example
 grid2D = zeros(20, 20);
 grid2D(5:15, 10) = 1; % Add a wall
@@ -296,3 +300,5 @@ visualizePathND(grid3D, path3D, explored3D, start3D, goal3D);
 % start4D = [1, 1, 1, 1];
 % goal4D = [10, 10, 10, 10];
 % [path4D, explored4D] = dijkstraND(grid4D, start4D, goal4D);
+
+%}
