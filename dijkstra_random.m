@@ -1,4 +1,8 @@
-function [path, cost] = dijkstra_nd_sampling(map_size, start, goal, obstacles, num_samples, step_size)
+function [path, cost] = dijkstra_random(p, num_samples, num_steps)
+    [path, cost] = dijkstra_nd_sampling(p.Dimensions, p.Start, p.End, (@(c)p.IsObstacle(c)), num_samples, num_steps);
+end
+
+function [path, explored] = dijkstra_nd_sampling(map_size, start, goal, obstacles, num_samples, step_size)
     % Dijkstra path planning with random sampling in N dimensions
     %
     % Inputs:
@@ -20,18 +24,18 @@ function [path, cost] = dijkstra_nd_sampling(map_size, start, goal, obstacles, n
     end
     
     % Create the roadmap
-    disp('Generating random samples...');
+    % disp('Generating random samples...');
     samples = [start; goal]; % Include start and goal in samples
     
     % Generate random samples
     for i = 1:num_samples
-        sample = zeros(1, num_dims);
+        sample = ones(1, num_dims);
         for d = 1:num_dims
-            sample(d) = rand() * map_size(d);
+            sample(d) = rand() * map_size(d) + 1;
         end
         
         % Add to samples if not in collision
-        if ~obstacles(sample)
+        if obstacles(sample) == 0
             samples = [samples; sample];
         end
     end
@@ -39,7 +43,7 @@ function [path, cost] = dijkstra_nd_sampling(map_size, start, goal, obstacles, n
     num_vertices = size(samples, 1);
     
     % Create adjacency matrix
-    disp('Creating connectivity graph...');
+    % disp('Creating connectivity graph...');
     adj_matrix = inf(num_vertices, num_vertices);
     
     % Connect vertices if they are within step_size distance
@@ -68,13 +72,16 @@ function [path, cost] = dijkstra_nd_sampling(map_size, start, goal, obstacles, n
             end
         end
     end
+    %adj_matrix
+    %scatter(samples(:,1), samples(:,2))
     
     % Run Dijkstra on the roadmap
-    disp('Running Dijkstra''s algorithm...');
-    [path_indices, total_cost] = dijkstra_graph(adj_matrix, 1, 2);
+    % disp('Running Dijkstra''s algorithm...');
+    [path_indices, vis] = dijkstra_graph(adj_matrix, 1, 2);
+    explored = samples(vis,:);
     
     if isempty(path_indices)
-        warning('No path found');
+        % warning('No path found');
         path = [];
         cost = inf;
         return;
@@ -82,11 +89,10 @@ function [path, cost] = dijkstra_nd_sampling(map_size, start, goal, obstacles, n
     
     % Convert indices to coordinates
     path = samples(path_indices, :);
-    cost = total_cost;
-    disp('Path planning complete');
+    % disp('Path planning complete');
 end
 
-function [path, cost] = dijkstra_graph(adj_matrix, start_idx, goal_idx)
+function [path, visited] = dijkstra_graph(adj_matrix, start_idx, goal_idx)
     % Dijkstra's algorithm on a graph
     %
     % Inputs:
@@ -144,11 +150,13 @@ function [path, cost] = dijkstra_graph(adj_matrix, start_idx, goal_idx)
             end
         end
     end
-    
+
+
     % Reconstruct path if goal was reached
     if visited(goal_idx)
         path = reconstruct_path(parent, goal_idx);
         cost = dist(goal_idx);
+        %explored = closedSet(1:closedCount, 1:dims);
     else
         % No path found
         path = [];
@@ -166,7 +174,7 @@ function path = reconstruct_path(parent, goal)
         path = [current, path];
     end
 end
-
+%{
 % Example usage:
 % Define map dimensions and obstacles
 map_size = [100, 100, 100]; % 3D map
@@ -222,3 +230,5 @@ if length(map_size) <= 3
     end
     grid on;
 end
+
+%}
